@@ -1,0 +1,77 @@
+- name: Install Docker on Ubuntu
+  hosts: servers
+  become: yes
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600  # Cache valid for 1 hour to avoid redundant updates
+
+    - name: Install required packages for Docker
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - software-properties-common
+
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+      register: gpg_key
+      retries: 3
+      delay: 5
+      until: gpg_key is success  # Retry on network failure
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+        state: present
+        update_cache: yes  # Update cache after adding repo
+
+    - name: Install Docker packages
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - docker-ce
+        - docker-ce-cli
+        - containerd.io
+
+    - name: Start and enable Docker service
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add user to docker group
+      user:
+        name: "{{ ansible_user | default('ubuntu') }}"
+        groups: docker
+        append: yes
+      when: ansible_user is defined  # Only run if user is defined
+
+    - name: Verify Docker installation
+      command: docker --version
+      register: docker_version
+      changed_when: false
+      failed_when: docker_version.rc != 0  # Fail if command errors
+
+    - name: Display Docker version
+      debug:
+        msg: "{{ docker_version.stdout }}"
+
+    - name: Run alpine/socat container to expose Docker socket
+      docker_container:
+        name: docker-socat
+        image: alpine/socat
+        state: started
+        restart_policy: always
+        ports:
+          - "0.0.0.0:2376:2375"
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock
+        command: tcp-listen:2375,fork,reuseaddr unix-connect:/var/run/docker.sock

@@ -1,0 +1,42 @@
+- name: Install Jenkins
+  hosts: servers
+  become: yes
+  tasks:
+    - name: Install OpenJDK
+      apt:
+        name: openjdk-21-jre-headless
+        state: present
+
+    - name: Add Jenkins repository key
+      get_url:
+        url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+        dest: /etc/apt/keyrings/jenkins-keyring.asc
+
+    - name: Add Jenkins repository
+      lineinfile:
+        path: /etc/apt/sources.list.d/jenkins.list
+        line: "deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/"
+        create: yes
+
+    - name: Update package list
+      apt:
+        update_cache: yes
+
+    - name: Install Jenkins
+      apt:
+        name: jenkins
+        state: present
+
+    - name: Enable and start Jenkins service
+      systemd:
+        name: jenkins
+        enabled: yes
+        state: started
+
+    - name: Show initial Jenkins admin password
+      command: cat /var/lib/jenkins/secrets/initialAdminPassword
+      register: jenkins_password
+
+    - name: Display admin password
+      debug:
+        msg: "{{ jenkins_password.stdout }}"
