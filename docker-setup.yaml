@@ -1,5 +1,5 @@
 - name: Install Docker on Ubuntu
-  hosts: servers
+  hosts: docker-srv
   become: yes
   tasks:
     - name: Update apt cache
