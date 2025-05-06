@@ -87,6 +87,11 @@ resource "aws_instance" "auto_ec2" {
   key_name               = aws_key_pair.id_rsa.key_name
   vpc_security_group_ids = [count.index == 0 ? aws_security_group.ec2_1_group.id : aws_security_group.ec2_2_group.id]
 
+  root_block_device {
+    volume_size = 30  # 30GB root volume
+    volume_type = "gp2"
+  }
+
   tags = {
     Name = "auto-ec2-${count.index + 1}"
   }
